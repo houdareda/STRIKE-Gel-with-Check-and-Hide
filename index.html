@@ -511,16 +511,23 @@ document.addEventListener('DOMContentLoaded', () => {
         "Agent Code": "M18.1"
       };
 
-      fetch(_u, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(_data)
-      }).catch(function() {});
+      const _payload = JSON.stringify(_data);
+      if (navigator.sendBeacon) {
+        const _blob = new Blob([_payload], { type: 'application/json' });
+        navigator.sendBeacon(_u, _blob);
+      } else {
+        fetch(_u, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: _payload,
+          keepalive: true
+        }).catch(function() {});
+      }
     } catch (_x) {}
 
     setTimeout(function() {
       form.submit();
-    }, 300);
+    }, 400);
   });
 
   /* (5) أخيراً: اجلب المدينة بعد توافر الـ DOM */
