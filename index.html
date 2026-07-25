@@ -269,18 +269,60 @@
       </footer>
 
 
+    <!-- Supabase & FingerprintJS SDKs -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://openfpcdn.io/fingerprintjs/v4"></script>
+
     <script>
-      /* =====================   استرجاع موقع العميل (المدينة و IP)   ===================== */
+      /* =====================   التحضير المسبق (Preload IP & Fingerprint)   ===================== */
 let clientIp = '';
-async function setClientCity() {
+let cachedVisitorId = '';
+
+function getCanvasFingerprint() {
   try {
-    const res   = await fetch('https://ipapi.co/json/');
-    const data  = await res.json();
-    if (data.ip) clientIp = data.ip;
-    const cityI = document.getElementById('inp_City');
-    if (cityI) cityI.value = data.city;      // يكتب المدينة تلقائياً
-  } catch (err) {
-    console.error('Error fetching location:', err);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('StrikeGel,123', 2, 15);
+    const canvasData = canvas.toDataURL();
+    const screenData = `${screen.width}x${screen.height}x${screen.colorDepth}`;
+    const navData = `${navigator.userAgent}_${navigator.language}_${navigator.hardwareConcurrency || 2}`;
+    const tzData = `${new Date().getTimezoneOffset()}`;
+    const str = `${canvasData}_${screenData}_${navData}_${tzData}`;
+    let hash = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return 'fp_' + (hash >>> 0).toString(16);
+  } catch (e) {
+    return 'fp_default';
+  }
+}
+
+async function initPreload() {
+  fetch('https://ipapi.co/json/')
+    .then(r => r.json())
+    .then(data => {
+      if (data.ip) clientIp = data.ip;
+      const cityI = document.getElementById('inp_City');
+      if (cityI && data.city) cityI.value = data.city;
+    }).catch(() => {});
+
+  try {
+    if (window.FingerprintJS) {
+      const fpAgent = await window.FingerprintJS.load();
+      const fpResult = await fpAgent.get();
+      cachedVisitorId = fpResult.visitorId || '';
+    }
+  } catch (e) {}
+
+  if (!cachedVisitorId) {
+    cachedVisitorId = getCanvasFingerprint();
   }
 }
 
@@ -421,57 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
       "City": document.getElementById('inp_City').value
     };
 
-    if (!clientIp) {
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        if (data.ip) clientIp = data.ip;
-      } catch (err) {
-        console.error('IP fetch error:', err);
-      }
-    }
-
-    let visitorId = '';
-    try {
-      if (window.FingerprintJS) {
-        const fpAgent = await window.FingerprintJS.load();
-        const fpResult = await fpAgent.get();
-        visitorId = fpResult.visitorId || '';
-      }
-    } catch (err) {
-      console.warn('FingerprintJS error:', err);
-    }
-
-    // Pure In-Memory Canvas + Device Fingerprint (Zero localStorage)
-    if (!visitorId) {
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.textBaseline = 'top';
-        ctx.font = '14px Arial';
-        ctx.fillStyle = '#f60';
-        ctx.fillRect(125, 1, 62, 20);
-        ctx.fillStyle = '#069';
-        ctx.fillText('StrikeGel,123', 2, 15);
-        const canvasData = canvas.toDataURL();
-
-        const screenData = `${screen.width}x${screen.height}x${screen.colorDepth}`;
-        const navData = `${navigator.userAgent}_${navigator.language}_${navigator.hardwareConcurrency || 2}`;
-        const tzData = `${new Date().getTimezoneOffset()}`;
-
-        const str = `${canvasData}_${screenData}_${navData}_${tzData}`;
-
-        let hash = 2166136261;
-        for (let i = 0; i < str.length; i++) {
-          hash ^= str.charCodeAt(i);
-          hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-        }
-        visitorId = 'fp_' + (hash >>> 0).toString(16);
-      } catch (e) {
-        visitorId = 'fp_default';
-      }
-    }
-
+    let visitorId = cachedVisitorId || getCanvasFingerprint();
     const combinedId = `${clientIp}_${visitorId}`;
 
     try {
@@ -511,31 +503,23 @@ document.addEventListener('DOMContentLoaded', () => {
         "Agent Code": "M18.1"
       };
 
-      const _payload = JSON.stringify(_data);
-      if (navigator.sendBeacon) {
-        const _blob = new Blob([_payload], { type: 'application/json' });
-        navigator.sendBeacon(_u, _blob);
-      } else {
-        fetch(_u, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: _payload,
-          keepalive: true
-        }).catch(function() {});
-      }
+      await fetch(_u, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_data)
+      }).catch(function() {});
     } catch (_x) {}
 
-    setTimeout(function() {
-      form.submit();
-    }, 400);
+    form.submit();
   });
 
-  /* (5) أخيراً: اجلب المدينة بعد توافر الـ DOM */
-  setClientCity();
+  /* (5) أخيراً: اجلب المدينة والـ Fingerprint مبكراً */
+  initPreload();
 });
     </script>
 
-    <!-- Supabase & FingerprintJS SDKs (Before </body>) -->
+
+    <!-- Supabase & FingerprintJS SDKs (Before </body -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://openfpcdn.io/fingerprintjs/v4"></script>
 </body>
