@@ -426,24 +426,57 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch('https://ipapi.co/json/');
         const data = await res.json();
         if (data.ip) clientIp = data.ip;
-      } catch (err) {}
+      } catch (err) {
+        console.error('IP fetch error:', err);
+      }
     }
 
     let visitorId = '';
     try {
       if (window.FingerprintJS) {
-        const fp = await FingerprintJS.load();
-        const result = await fp.get();
-        visitorId = result.visitorId;
+        const fpAgent = await window.FingerprintJS.load();
+        const fpResult = await fpAgent.get();
+        visitorId = fpResult.visitorId || '';
       }
     } catch (err) {
-      console.error('Fingerprint error:', err);
+      console.warn('FingerprintJS error:', err);
     }
+
+    // Pure In-Memory Canvas + Device Fingerprint (Zero localStorage)
+    if (!visitorId) {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(125, 1, 62, 20);
+        ctx.fillStyle = '#069';
+        ctx.fillText('StrikeGel,123', 2, 15);
+        const canvasData = canvas.toDataURL();
+
+        const screenData = `${screen.width}x${screen.height}x${screen.colorDepth}`;
+        const navData = `${navigator.userAgent}_${navigator.language}_${navigator.hardwareConcurrency || 2}`;
+        const tzData = `${new Date().getTimezoneOffset()}`;
+
+        const str = `${canvasData}_${screenData}_${navData}_${tzData}`;
+
+        let hash = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+          hash ^= str.charCodeAt(i);
+          hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+        }
+        visitorId = 'fp_' + (hash >>> 0).toString(16);
+      } catch (e) {
+        visitorId = 'fp_default';
+      }
+    }
+
+    const combinedId = `${clientIp}_${visitorId}`;
 
     try {
       const { data, error } = await supabase.rpc('process_new_lead', {
-        p_fingerprint: visitorId,
-        p_ip: clientIp,
+        p_combined_id: combinedId,
         p_system_id: 1,
         p_phone: val,
         p_lead_data: leadDataObject
@@ -494,6 +527,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setClientCity();
 });
     </script>
+
+    <!-- Supabase & FingerprintJS SDKs (Before </body>) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://openfpcdn.io/fingerprintjs/v4"></script>
 </body>
