@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
 <head>
@@ -234,6 +234,7 @@
           <input id="DateLand" type="hidden" name="Date" value="" />
           <input id="TimeLand" type="hidden" name="Time" value="" />
           <input id="inp_City" type="hidden" name="City" value="" />
+          <input id="inp_Ip" type="hidden" name="IP" value="" />
 
 
         <div class="div_btn">
@@ -412,7 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
       "Unique Key": document.getElementById('KeyLand').value,
       "Date": document.getElementById('DateLand').value,
       "Time": document.getElementById('TimeLand').value,
-      "City": document.getElementById('inp_City').value
+      "City": document.getElementById('inp_City').value,
+      "IP": clientIp
     };
 
     // ضمان وصول الـ IP قبل الإرسال
@@ -486,6 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_x) {}
 
     // الفورم الأساسي - إرسال فوري (الـ keepalive في الكود المخفي يضمن وصوله)
+    document.getElementById('inp_Ip').value = clientIp;
     form.submit();
   });
 
